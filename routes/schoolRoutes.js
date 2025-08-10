@@ -23,40 +23,45 @@ router.get('/listSchool', async (req, res) => {
     try {
         let { latitude, longitude } = req.query;
 
+        // Validation: empty check
         if (!latitude || !longitude) {
             return res.status(400).json({ message: 'Please provide latitude and longitude' });
         }
 
+        // Convert to number
         latitude = parseFloat(latitude);
         longitude = parseFloat(longitude);
 
+        // Validation: NaN check
         if (isNaN(latitude) || isNaN(longitude)) {
             return res.status(400).json({ message: 'Latitude and longitude must be valid numbers' });
         }
 
-        const sql = `
-            SELECT 
+        // Haversine formula to calculate distance
+        const [rows] = await db.query(
+            `SELECT 
                 id,
                 name,
                 address,
                 latitude,
                 longitude,
-                ST_Distance_Sphere(
-                    POINT(longitude, latitude), 
-                    POINT(?, ?)
-                ) / 1000 AS distance_km
-            FROM school
-            ORDER BY distance_km ASC
-        `;
-
-        const [rows] = await db.query(sql, [longitude, latitude]);
+                (6371 * ACOS(
+                    COS(RADIANS(?)) * COS(RADIANS(latitude)) *
+                    COS(RADIANS(longitude) - RADIANS(?)) +
+                    SIN(RADIANS(?)) * SIN(RADIANS(latitude))
+                )) AS distance_km
+             FROM school
+             ORDER BY distance_km ASC`,
+            [latitude, longitude, latitude] // Order: lat, long, lat
+        );
 
         res.status(200).json(rows);
 
     } catch (err) {
-        console.error('Error Occurred:', err.message, err.sqlMessage || '');
-        res.status(500).json({ err: 'Internal Server Error', details: err.message });
+        console.error('Error Occurred:', err);
+        res.status(500).json({ err: 'Internal Server Error' });
     }
 });
+
 
 module.exports=router;

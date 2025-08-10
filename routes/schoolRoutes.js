@@ -23,21 +23,18 @@ router.get('/listSchool', async (req, res) => {
     try {
         let { latitude, longitude } = req.query;
 
-        // Validation: empty check
         if (!latitude || !longitude) {
             return res.status(400).json({ message: 'Please provide latitude and longitude' });
         }
 
-        // Convert to number
+        // Convert to numbers
         latitude = parseFloat(latitude);
         longitude = parseFloat(longitude);
 
-        // Validation: NaN check
         if (isNaN(latitude) || isNaN(longitude)) {
             return res.status(400).json({ message: 'Latitude and longitude must be valid numbers' });
         }
 
-        // Haversine formula to calculate distance
         const [rows] = await db.query(
             `SELECT 
                 id,
@@ -45,14 +42,13 @@ router.get('/listSchool', async (req, res) => {
                 address,
                 latitude,
                 longitude,
-                (6371 * ACOS(
-                    COS(RADIANS(?)) * COS(RADIANS(latitude)) *
-                    COS(RADIANS(longitude) - RADIANS(?)) +
-                    SIN(RADIANS(?)) * SIN(RADIANS(latitude))
-                )) AS distance_km
+                ST_Distance_Sphere(
+                    POINT(longitude, latitude), 
+                    POINT(?, ?)
+                ) / 1000 AS distance_km
              FROM school
              ORDER BY distance_km ASC`,
-            [latitude, longitude, latitude] // Order: lat, long, lat
+            [longitude, latitude]
         );
 
         res.status(200).json(rows);
@@ -62,6 +58,5 @@ router.get('/listSchool', async (req, res) => {
         res.status(500).json({ err: 'Internal Server Error' });
     }
 });
-
 
 module.exports=router;

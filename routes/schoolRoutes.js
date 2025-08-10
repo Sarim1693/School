@@ -19,15 +19,14 @@ router.post('/addSchool', async(req, res)=>{
         res.status(501).json({err: 'Internal Server Error'});
     }
 });
-router.get('/listSchool', async(req, res)=>{
-       try {
+router.get('/listSchool', async (req, res) => {
+    try {
         let { latitude, longitude } = req.query;
 
         if (!latitude || !longitude) {
             return res.status(400).json({ message: 'Please provide latitude and longitude' });
         }
 
-        // Convert to numbers
         latitude = parseFloat(latitude);
         longitude = parseFloat(longitude);
 
@@ -35,8 +34,8 @@ router.get('/listSchool', async(req, res)=>{
             return res.status(400).json({ message: 'Latitude and longitude must be valid numbers' });
         }
 
-        const [rows] = await db.query(
-            `SELECT 
+        const sql = `
+            SELECT 
                 id,
                 name,
                 address,
@@ -46,17 +45,18 @@ router.get('/listSchool', async(req, res)=>{
                     POINT(longitude, latitude), 
                     POINT(?, ?)
                 ) / 1000 AS distance_km
-             FROM school
-             ORDER BY distance_km ASC`,
-            [longitude, latitude]
-        );
+            FROM school
+            ORDER BY distance_km ASC
+        `;
+
+        const [rows] = await db.query(sql, [longitude, latitude]);
 
         res.status(200).json(rows);
 
     } catch (err) {
-        console.error('Error Occurred:', err);
-        res.status(500).json({ err: 'Internal Server Error' });
+        console.error('Error Occurred:', err.message, err.sqlMessage || '');
+        res.status(500).json({ err: 'Internal Server Error', details: err.message });
     }
+});
 
-})
 module.exports=router;
